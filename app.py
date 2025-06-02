@@ -3,27 +3,26 @@ import torch
 import numpy as np
 import os
 import cv2
-import requests
+import gdown
 from PIL import Image
 from transformers import AutoProcessor, AutoModelForVideoClassification
 
 # ---------------------
-# Download model if not already present
+# Download model from Google Drive using gdown
 # ---------------------
-def download_model_if_needed(url, save_path):
+def download_model_if_needed(save_path):
     if not os.path.exists(save_path):
-        st.info("Downloading fine-tuned model from Google Drive...")
-        response = requests.get(url)
-        with open(save_path, 'wb') as f:
-            f.write(response.content)
-        st.success("Model download complete!")
+        st.info("Downloading model from Google Drive...")
+        file_id = "1yegsjiRVRtXpLfaIpisNPSX6B931sbTG"  # Your shared Drive file ID
+        url = f"https://drive.google.com/uc?id={file_id}"
+        gdown.download(url, save_path, quiet=False)
+        st.success("Model downloaded successfully!")
 
 # ---------------------
-# Load model and processor
+# Load processor and model
 # ---------------------
 def load_model(model_path="timesformer_model.pth"):
-    url = "https://drive.google.com/uc?export=download&id=1yegsjiRVRtXpLfaIpisNPSX6B931sbTG"
-    download_model_if_needed(url, model_path)
+    download_model_if_needed(model_path)
 
     processor = AutoProcessor.from_pretrained("facebook/timesformer-base-finetuned-k400")
     model = AutoModelForVideoClassification.from_pretrained("facebook/timesformer-base-finetuned-k400")
@@ -33,7 +32,7 @@ def load_model(model_path="timesformer_model.pth"):
     return processor, model
 
 # ---------------------
-# Extract video frames
+# Extract 8 frames from video
 # ---------------------
 def extract_frames(video_path, num_frames=8, frame_rate=32):
     cap = cv2.VideoCapture(video_path)
@@ -60,30 +59,30 @@ class_to_activity = {
 }
 
 # ---------------------
-# Streamlit Interface
+# Streamlit App UI
 # ---------------------
-st.set_page_config(layout="wide", page_title="Action Recognition")
-st.title("🎬 Human Action Recognition App")
+st.set_page_config(layout="wide", page_title="Action Recognition App")
+st.title("🎬 Human Action Recognition")
 
 st.write("""
-Upload a video clip and this app will classify the action using a fine-tuned **TimeSformer** model.
-The model will be automatically downloaded from Google Drive if not available locally.
+Upload a short video clip, and this app will classify the action using a fine-tuned **TimeSformer** model.
+The model is automatically downloaded from Google Drive if not already present.
 """)
 
-st.sidebar.title("Upload Your Video 🎥")
-uploaded_file = st.sidebar.file_uploader("Upload a video file", type=["mp4", "avi", "mov"])
+st.sidebar.title("📁 Upload Your Video")
+uploaded_file = st.sidebar.file_uploader("Supported formats: MP4, AVI, MOV", type=["mp4", "avi", "mov"])
 
-# Run prediction
 if uploaded_file is not None:
     with st.spinner("Loading model..."):
         processor, model = load_model()
 
-    # Save uploaded file temporarily
-    temp_video_path = "temp_uploaded_video.mp4"
-    with open(temp_video_path, "wb") as f:
+    # Save uploaded video to temp file
+    video_path = "temp_video.mp4"
+    with open(video_path, "wb") as f:
         f.write(uploaded_file.read())
 
-    frames = extract_frames(temp_video_path)
+    # Extract frames
+    frames = extract_frames(video_path)
 
     if frames:
         inputs = processor(images=frames, return_tensors="pt")
@@ -94,13 +93,14 @@ if uploaded_file is not None:
 
         predicted_activity = class_to_activity.get(predicted_class_idx, "Unknown Activity")
 
-        # Display
+        # Display results
         col1, col2 = st.columns([2, 1])
         with col1:
-            st.video(temp_video_path)
+            st.video(video_path)
         with col2:
-            st.markdown("### 🏷️ Predicted Action")
+            st.write("### 🏷️ Predicted Action")
             st.markdown(f"**{predicted_activity}**")
             st.markdown(f"**Confidence:** {confidence * 100:.2f}%")
     else:
-        st.error("Couldn't extract enough frames from the video.")
+        st.error("Unable to extract enough frames from the video.")
+
