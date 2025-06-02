@@ -6,5 +6,6 @@ pillow
 matplotlib
 pandas
 altair
-requests
+gdown
+
 
