@@ -1,7 +1,10 @@
 streamlit
 torch
 transformers
-opencv-python
+opencv-python-headless
 pillow
 matplotlib
+pandas
+altair
 requests
+
